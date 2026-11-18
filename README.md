@@ -65,6 +65,46 @@ ALTER TABLE tb_voucher_order
 ADD UNIQUE INDEX uk_voucher_order_user_voucher (user_id, voucher_id);
 ```
 
+#### 可选：在本机用 Docker 提供依赖
+
+Go 服务仍在宿主机运行。MySQL、Redis 和 Kafka 可以分别使用已有实例，也可以用容器提供。容器将端口映射到上面列出的回环地址，因此 Go 服务可直接使用仓库的默认配置。已有实例占用对应端口时，跳过该容器，并确认已有实例的连接配置、库表或 Topic 已就绪。
+
+首次创建容器时，启动 Docker，在仓库根目录打开 PowerShell。以下命令沿用项目的本地开发配置（MySQL 用户 `root`，密码为空），端口仅发布到本机。
+
+```powershell
+docker network create hmdp-local
+
+# MySQL 仅在新数据卷首次初始化时导入 hmdp.sql
+$sql = (Resolve-Path .\hmdp.sql).Path
+docker run -d --name hmdp-mysql --network hmdp-local -p 127.0.0.1:3306:3306 `
+  -v hmdp-mysql-data:/var/lib/mysql `
+  --mount "type=bind,source=$sql,target=/docker-entrypoint-initdb.d/01-hmdp.sql,readonly" `
+  -e MYSQL_DATABASE=hmdp -e MYSQL_ALLOW_EMPTY_PASSWORD=yes mysql:8.0
+
+docker run -d --name hmdp-redis --network hmdp-local -p 127.0.0.1:6379:6379 redis:7-alpine
+
+# 单节点 Kafka，向宿主机上的 Go 客户端公布可达地址
+docker run -d --name hmdp-kafka --network hmdp-local -p 127.0.0.1:9092:9092 `
+  -v hmdp-kafka-data:/var/lib/kafka/data -e KAFKA_LOG_DIRS=/var/lib/kafka/data `
+  -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller `
+  -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 `
+  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092 `
+  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT `
+  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 `
+  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 `
+  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 apache/kafka:3.9.1
+```
+
+容器就绪后，创建 Topic 并检查数据库和缓存。全新导入的示例库有 10 个商铺分类，Redis 应返回 `PONG`。
+
+```powershell
+docker exec hmdp-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic voucher-order-topic --partitions 1 --replication-factor 1
+docker exec hmdp-mysql mysql --protocol=TCP --host=127.0.0.1 -uroot -D hmdp -e 'SELECT COUNT(*) FROM tb_shop_type;'
+docker exec hmdp-redis redis-cli ping
+```
+
+以后重新启动这三个已有容器，执行 `docker start hmdp-mysql hmdp-redis hmdp-kafka` 即可。MySQL 和 Kafka 的数据保存在各自的 Docker 卷中。
+
 ### 4. 修改配置
 
 编辑 `config/config.yaml`，重点检查以下字段：
