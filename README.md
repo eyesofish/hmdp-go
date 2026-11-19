@@ -1,4 +1,4 @@
-# HMDP-Go
+# 本地生活商户点评与优惠券平台（Go 后端）
 
 ## 目录
 
@@ -37,7 +37,7 @@
 - MySQL: `8.x`
 - Redis: `6.x/7.x`
 - Kafka: `3.x`（或兼容发行版）
-- 黑马点评前端：用原项目的`nginx-1.18.0.zip`即可，解压后直接运行`nginx.exe`。
+- 可选前端：仓库已包含黑马点评课程的静态页面，使用 Docker Compose 启动。
 
 ### 2. 拉取依赖
 
@@ -116,6 +116,14 @@ go run ./cmd/api/main.go
 ```
 
 启动成功后默认监听：`http://localhost:8081`
+
+要打开网页，在仓库根目录的另一个终端运行：
+
+```bash
+docker compose up -d frontend
+```
+
+打开 [本地前端](http://127.0.0.1:8080/)。Nginx 提供 `frontend/public` 中的页面，将 `/api/` 请求转发到宿主机 Go 服务的 8081 端口。前端资源取自课程压缩包的 `nginx-1.18.0/html/hmdp/` 目录。[GitHub 来源（固定版本）](https://github.com/lhpqaq/xzdp-go/blob/8be36c8a1c2b93d465ab6e89790c5bfeaca3f2f7/resources/nginx-1.18.0.zip)
 
 ### 6. 快速验证
 
