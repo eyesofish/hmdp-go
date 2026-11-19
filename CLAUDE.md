@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HMDP-Go is a Go port of the "Heima Dianping" O2O social commerce platform — a review/social app covering user auth, shop discovery, blogging, voucher/coupon management, and high-concurrency flash sales (seckill). It's a monolithic Go application using Gin + GORM + Redis + Kafka.
+本地生活商户点评与优惠券平台（Go 后端） is a Go port of the "Heima Dianping" O2O social commerce platform — a review/social app covering user auth, shop discovery, blogging, voucher/coupon management, and high-concurrency flash sales (seckill). It's a monolithic Go application using Gin + GORM + Redis + Kafka.
 
 **Module:** `github.com/amemiya02/hmdp-go` | **Go:** 1.25.6
 
