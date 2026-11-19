@@ -62,9 +62,17 @@ test('成功提示须等待订单提交，订单号与 MySQL 逐位一致', asyn
     expect((await history()).filter(text => text.includes('抢购成功'))).toEqual([]);
     expect(submissions).toBe(1);
 
-    await scenario.releaseStockLock();
-    await expect.poll(() => scenario.orderIds(), { timeout: 10_000 }).toHaveLength(1);
+    // Start listening before unlocking so a fast consumer cannot race the test.
+    const confirmedResponse = page.waitForResponse(async res =>
+      isConfirmation(res) && res.ok() && (await res.json()).data?.confirmed === true,
+    { timeout: 15_000 });
+    const [confirmed] = await Promise.all([
+      confirmedResponse,
+      scenario.releaseStockLock().then(() =>
+        expect.poll(() => scenario.orderIds(), { timeout: 10_000 }).toHaveLength(1)),
+    ]);
     const [id] = await scenario.orderIds();
+    expect(await confirmed.json()).toMatchObject({ success: true, data: { orderId: id } });
     expect(Number(id).toString(), '测试订单号必须能揭示 JS 数字精度损失').not.toBe(id);
     expect(accepted.data).toBe(id);
     const successMessage = page.getByText(/抢购成功.*[0-9]/).first();
@@ -74,7 +82,11 @@ test('成功提示须等待订单提交，订单号与 MySQL 逐位一致', asyn
     expect(submissions).toBe(1);
     console.log(JSON.stringify({ userId, voucherId, heldOrderIds, confirmedOrderId: id, displayed: shown[0] }));
   } catch (error) {
-    const evidence = { userId, voucherId, submissions, notices: await history(), mysqlOrderIds: await scenario.orderIds() };
+    const evidence = {
+      userId, voucherId, submissions,
+      notices: await history().catch(() => 'page unavailable'),
+      mysqlOrderIds: await scenario.orderIds().catch(() => 'database unavailable'),
+    };
     console.error(JSON.stringify(evidence));
     await testInfo.attach('order-confirmation', { body: JSON.stringify(evidence), contentType: 'application/json' });
     throw error;

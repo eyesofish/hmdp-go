@@ -149,6 +149,20 @@ go test -race -count=1 ./...
 
 默认测试覆盖 Kafka 消息构造与错误传播、消费者重试/提交顺序、Channel 取消语义和锁 Key 规则。CI 执行同一条命令。
 
+### 浏览器验收：秒杀订单确认
+
+从仓库根目录执行以下命令。需要 Docker Compose 2.30+、Node.js 20+（CI 使用 24）和 npm。首次安装浏览器时，在 Linux 上可以加 `--with-deps` 安装系统依赖。
+
+```bash
+npm --prefix tests/e2e ci
+cd tests/e2e
+npx playwright install chromium
+cd ../..
+npm --prefix tests/e2e test
+```
+
+测试入口创建独立的 MySQL、Redis、Kafka、Go API 和 Nginx，使用临时卷及动态本机端口。浏览器以测试用户在商铺详情页点击“限时抢购”。测试先锁住该券的库存行，检查未落库时的提示和重复点击，再释放锁，按用户与券查库，逐位核对成功提示中的订单号。结束后入口清理本次 Compose 项目。PR 的 `e2e` 检查执行同一条命令。
+
 ### 集成测试
 
 集成测试会连接并修改 `config/config.yaml` 指向的 MySQL 和 Redis，只应在独立测试环境运行：
