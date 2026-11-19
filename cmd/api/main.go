@@ -182,6 +182,7 @@ func SetupRouter(voucherOrderService *service.VoucherOrderService) *gin.Engine {
 	voucherOrderGroup := r.Group("/voucher-order").Use(middleware.LoginInterceptor())
 	{
 		voucherOrderGroup.POST("/seckill/:id", voucherOrderHandler.SeckillVoucher)
+		voucherOrderGroup.GET("/:id/confirmation", voucherOrderHandler.Confirmation)
 	}
 
 	// blog

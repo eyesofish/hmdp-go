@@ -33,6 +33,7 @@ type messageReader interface {
 }
 
 type VoucherOrderService struct {
+	orderRepository    *repository.VoucherOrderRepository
 	PreCheck           *seckill.PreCheck
 	SyncExec           order.Executor
 	ChannelExec        *order.ChannelExecutor
@@ -45,12 +46,17 @@ func NewVoucherOrderService() *VoucherOrderService {
 	svr := repository.NewSeckillVoucherRepository()
 
 	return &VoucherOrderService{
+		orderRepository:    vor,
 		PreCheck:           seckill.NewPreCheck(global.RedisClient),
 		SyncExec:           order.NewSyncExecutor(vor, svr),
 		ChannelExec:        order.NewChannelExecutor(1024 * 1024),
 		KafkaExec:          order.NewKafkaExecutor(global.KafkaWriter),
 		consumerRetryDelay: defaultConsumerRetryDelay,
 	}
+}
+
+func (s *VoucherOrderService) IsOrderConfirmed(ctx context.Context, orderID int64) (bool, error) {
+	return s.orderRepository.HasCommittedOrder(ctx, orderID, util.GetUserId(ctx))
 }
 
 // SeckillVoucherV1 演进版本1: 同步阻塞 (Sync + DB Lock)
