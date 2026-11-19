@@ -27,3 +27,20 @@ jobs:
           go test -exec=/usr/bin/true -tags=integration ./...
           go test -exec=/usr/bin/true -tags=load ./...
           go test -exec=/usr/bin/true -tags=manual ./internal/test/
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - run: npm --prefix tests/e2e ci
+      - name: Install Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Verify seckill confirmation in the browser
+        run: npm --prefix tests/e2e test

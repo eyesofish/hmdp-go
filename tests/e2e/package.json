@@ -1,0 +1,13 @@
+{
+  "name": "hmdp-browser-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "mysql2": "3.24.6",
+    "redis": "6.3.1"
+  }
+}

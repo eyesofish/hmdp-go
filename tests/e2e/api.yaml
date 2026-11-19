@@ -1,0 +1,19 @@
+server:
+  port: 8081
+  mode: debug
+mysql:
+  host: mysql
+  port: 3306
+  username: root
+  dbname: hmdp
+  charset: utf8mb4
+  max_open_conns: 20
+  max_idle_conns: 10
+redis:
+  host: redis
+  port: 6379
+  timeout: 5s
+kafka:
+  brokers: ["kafka:29092"]
+  topic: voucher-order-topic
+  group_id: voucher-order-group
