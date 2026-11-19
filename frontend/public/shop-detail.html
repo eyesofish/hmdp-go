@@ -64,7 +64,7 @@
       <span class="voucher-icon">券</span>
       <span style="font-weight: bold;">代金券</span>
     </div>
-    <div class="voucher-box" v-for="v in vouchers" :key="v.id" v-if="!isEnd(v)">
+    <div class="voucher-box" v-for="v in vouchers" :key="v.id" v-if="orders[v.id] || !isEnd(v)">
       <div class="voucher-circle">
         <div class="voucher-b"></div>
         <div class="voucher-b"></div>
@@ -77,7 +77,16 @@
       </div>
       <div class="voucher-right">
         <div v-if="v.type" class="seckill-box">
-          <div class="voucher-btn" :class="{'disable-btn': isNotBegin(v) || v.stock < 1}" @click="seckill(v)">限时抢购</div>
+          <button type="button" class="voucher-btn"
+                  :disabled="!!orders[v.id] || isNotBegin(v) || v.stock < 1"
+                  @click="seckill(v)">限时抢购</button>
+          <div role="status" aria-live="polite" class="order-status">
+            <template v-if="orders[v.id]">
+              <span v-if="orders[v.id].phase === 'pending'">订单处理中，请勿重复提交</span>
+              <span v-else-if="orders[v.id].phase === 'confirmed'">抢购成功，订单号：{{ orders[v.id].id }}</span>
+              <span v-else-if="orders[v.id].phase === 'unavailable'">订单已受理，暂时无法查询，请勿重复提交</span>
+            </template>
+          </div>
           <div class="seckill-stock">剩余 <span>{{v.stock}}</span> 张</div>
           <div class="seckill-time">{{formatTime(v)}}</div>
         </div>
@@ -150,9 +159,15 @@
     data: {
       util,
       shop: {},
-      vouchers: []
+      vouchers: [],
+      orders: {}
     },
     created() {
+      this.pollTimers = new Map();
+      this.pollGeneration = 0;
+      this.pageActive = true;
+      window.addEventListener('pagehide', this.stopPolling);
+      window.addEventListener('pageshow', this.resumePolling);
       // 获取参数
       let shopId = util.getUrlParam("id");
       // 查询酒店信息
@@ -160,7 +175,46 @@
       // 查询优惠券信息
       this.queryVoucher(shopId);
     },
+    beforeDestroy() {
+      window.removeEventListener('pagehide', this.stopPolling);
+      window.removeEventListener('pageshow', this.resumePolling);
+      this.stopPolling();
+    },
     methods: {
+      stopPolling() {
+        this.pageActive = false;
+        this.pollGeneration++;
+        this.pollTimers.forEach(timer => clearTimeout(timer));
+        this.pollTimers.clear();
+      },
+      resumePolling() {
+        if (this.pageActive) return;
+        this.pageActive = true;
+        Object.values(this.orders).forEach(order => {
+          if (order.phase === 'pending') this.checkConfirmation(order);
+        });
+      },
+      async checkConfirmation(order) {
+        if (!this.pageActive) return;
+        const generation = this.pollGeneration;
+        let confirmation;
+        try {
+          const response = await axios.get('/voucher-order/' + order.id + '/confirmation');
+          confirmation = response.data;
+        } catch {
+          // A failed read leaves the accepted order pending.
+        }
+        if (generation !== this.pollGeneration) return;
+        if (confirmation && confirmation.confirmed === true && confirmation.orderId === order.id) {
+          order.phase = 'confirmed';
+          return;
+        }
+        const timer = setTimeout(() => {
+          this.pollTimers.delete(order.id);
+          this.checkConfirmation(order);
+        }, 1000);
+        this.pollTimers.set(order.id, timer);
+      },
       goBack() {
         history.back();
       },
@@ -197,7 +251,8 @@
       isEnd(v){
         return new Date(v.endTime).getTime() < new Date().getTime();
       },
-      seckill(v){
+      async seckill(v){
+        if (this.orders[v.id]) return;
         if(!token){
           this.$message.error("请先登录")
           // 未登录，跳转
@@ -218,14 +273,21 @@
           this.$message.error("库存不足，请刷新再试试！")
           return;
         }
-        let id = v.id;
-        // 秒杀抢购
-        axios.post("/voucher-order/seckill/" + id)
-        .then(({data}) => {
-          // 抢购成功，这里输出订单id，支付功能TODO
-          this.$message.success("抢购成功，订单id：" + data)
-        })
-        .catch(this.$message.error)
+        const order = { phase: 'submitting', id: null };
+        this.$set(this.orders, v.id, order);
+        try {
+          const {data} = await axios.post('/voucher-order/seckill/' + v.id);
+          if (typeof data !== 'string' || !/^[1-9]\d*$/.test(data)) {
+            order.phase = 'unavailable';
+            return;
+          }
+          order.id = data;
+          order.phase = 'pending';
+          this.checkConfirmation(order);
+        } catch (error) {
+          this.$delete(this.orders, v.id);
+          this.$message.error(error);
+        }
       }
     }
   })

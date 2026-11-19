@@ -229,8 +229,18 @@
 .seckill-box div{
     font-size: 12px;
 }
-.disable-btn{
+.seckill-box button.voucher-btn {
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.seckill-box button.voucher-btn:disabled {
     background-color: #adacab;
+    cursor: default;
+}
+.order-status {
+    overflow-wrap: anywhere;
+    text-align: right;
 }
 .seckill-time{
     color: #F63;
